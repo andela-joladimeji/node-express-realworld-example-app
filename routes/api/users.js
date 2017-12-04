@@ -1,13 +1,14 @@
 var mongoose = require('mongoose');
 var router = require('express').Router();
 var passport = require('passport');
+var _ = require('lodash');
 var User = mongoose.model('User');
+var FavoriteTag = mongoose.model('FavoriteTag');
 var auth = require('../auth');
 
 router.get('/user', auth.required, function(req, res, next){
-  User.findById(req.payload.id).then(function(user){
+  User.findById(req.payload.id).populate('favoriteTags').then(function(user){
     if(!user){ return res.sendStatus(401); }
-
     return res.json({user: user.toAuthJSON()});
   }).catch(next);
 });
@@ -32,7 +33,19 @@ router.put('/user', auth.required, function(req, res, next){
     if(typeof req.body.user.password !== 'undefined'){
       user.setPassword(req.body.user.password);
     }
+    if (typeof req.body.user.favoriteTags !== 'undefined') {
 
+      _.map(req.body.user.favoriteTags, (favoriteTag) => {
+        newFavoriteTag = new FavoriteTag({
+          favoriteTag: favoriteTag,
+          owner: user._id
+        })
+        newFavoriteTag.save(function (err) {
+          if (err) return next(err);
+          user.favoriteTags.push(newFavoriteTag)
+        })
+      })
+    }
     return user.save().then(function(){
       return res.json({user: user.toAuthJSON()});
     });
